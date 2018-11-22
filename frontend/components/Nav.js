@@ -10,6 +10,7 @@ const Nav = () => (
         <Link href="/">
           <a>Shop</a>
         </Link>
+        {console.log(me)}
         {me && (
           <>
             <Link href="/sell">
