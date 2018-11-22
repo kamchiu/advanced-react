@@ -4,14 +4,21 @@ import gql from 'graphql-tag'
 import { CURRENT_USER_QUERY } from './User'
 
 const SIGN_OUT_MUTATION = gql`
-  mutaion SIGN_OUT_MUTATION {
+  mutation SIGN_OUT_MUTATION {
     signout {
       message
     }
   }
 `
 const Signout = props => (
-  <Mutation mutation={SIGN_OUT_MUTATION} refetchQueries={CURRENT_USER_QUERY}>
+  <Mutation
+    mutation={SIGN_OUT_MUTATION}
+    refetchQueries={[
+      {
+        query: CURRENT_USER_QUERY
+      }
+    ]}
+  >
     {signout => <button onClick={signout}>sign out</button>}
   </Mutation>
 )
