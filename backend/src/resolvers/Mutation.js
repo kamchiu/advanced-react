@@ -2,20 +2,28 @@ const bcrypt = require('bcryptjs') // for hashing password
 const jwt = require('jsonwebtoken')
 const { randomBytes } = require('crypto')
 const { promisify } = require('util')
+const { transport, makeANiceEmail } = require('../mail')
+const { hasPermission } = require('../utils')
 
 const mutations = {
   async createItem(parent, args, ctx, info) {
-    // TODO: check if they are login
+    if (!ctx.request.userId) {
+      throw new Error('You must logged in')
+    }
     const item = await ctx.db.mutation.createItem(
       {
         data: {
+          user: {
+            connect: {
+              id: ctx.request.userId
+            }
+          },
           ...args
         }
       },
       info
     )
 
-    console.log(item)
     return item
   },
   updateItem(parent, args, ctx, info) {
@@ -36,6 +44,14 @@ const mutations = {
     // 1. find the item
     const item = await ctx.db.query.item({ where }, `{ id title}`)
     // 2.check if they own that item, or have the permissions
+    const ownsItem = item.user.id === ctx.request.userId
+    const hasPermissions = ctx.request.user.permissions.some(permission =>
+      ['ADMIN', 'ITEMDELETE'].includes(permission)
+    )
+
+    if (!ownsItem && !hasPermissions) {
+      throw new Error('you do not have permission to do that.')
+    }
 
     return ctx.db.mutation.deleteItem({ where }, info)
   },
@@ -109,7 +125,19 @@ const mutations = {
       where: { email: args.email },
       data: { resetToken, resetTokenExpiry }
     })
+
+    // send email
+    const mailRes = await transport.sendMail({
+      from: 'liujinchaona@gmail.com',
+      to: user.email,
+      subject: 'your password reset token',
+      html: makeANiceEmail(`
+      Your password reset token is here! \n\n <a href="${
+        process.env.FRONTEND_URL
+      }/reset?resetToken=${resetToken}">Click To Reset</a>`)
+    })
     console.log(res)
+    return { message: 'thanks' }
   },
   async resetPassword(parent, args, ctx, info) {
     // check if the passwords match
@@ -118,7 +146,7 @@ const mutations = {
     }
 
     // token是否过期
-    cosnt[user] = await ctx.db.query.users({
+    const [user] = await ctx.db.query.users({
       where: {
         resetToken: args.resetToken,
         resetTokenExpiry_gte: Date.now() - 3600000
@@ -149,6 +177,97 @@ const mutations = {
     })
 
     return updateUser
+  },
+  async updatePermissions(parent, args, ctx, info) {
+    if (!ctx.request.userId) {
+      throw new Error('you must logged in')
+    }
+
+    const currentUser = await ctx.db.query.user(
+      {
+        where: {
+          id: ctx.request.userId
+        }
+      },
+      info
+    )
+    hasPermission(currentUser, ['ADMIN', 'PERMISSIONUPDATE'])
+
+    return ctx.db.mutation.updateUser(
+      {
+        data: {
+          permissions: {
+            set: args.permissions
+          }
+        },
+        where: {
+          id: args.userId
+        }
+      },
+      info
+    )
+  },
+  async addToCart(parent, args, ctx, info) {
+    // 1. make sure they are signed in
+    const { userId } = ctx.request
+    // 2. query the users current cart
+    const [existingCartItem] = await ctx.db.query.cartItems({
+      user: { id: userId },
+      item: { id: args.id }
+    })
+
+    // check if that item is already in their cart and inc 1 if it is
+    if (existingCartItem) {
+      console.log('this item is already in their cart')
+      return ctx.db.mutation.updateCartItem(
+        {
+          where: { id: existingCartItem.id },
+          data: { quantity: existingCartItem.quantity + 1 }
+        },
+        info
+      )
+    }
+
+    // 4.if not in their cart
+    return ctx.db.mutation.createCartItem(
+      {
+        data: {
+          user: {
+            connect: { id: userId }
+          },
+          item: {
+            connect: { id: args.id }
+          }
+        }
+      },
+      info
+    )
+  },
+  async removeFromCart(parent, args, ctx, info) {
+    // 1. find the cart item
+    const cartItem = await ctx.db.query.cartItem(
+      {
+        where: {
+          id: args.id
+        }
+      },
+      `{id, user { id }}`
+    )
+    // make sure we found an item
+    if (!cartItem) throw new Error('No cartItem found')
+
+    // 2. make sure they own the item
+    if (cartItem.user.id !== ctx.request.userId) throw new Error('cheating')
+
+    // 3. delete that item
+    return ctx.db.mutation.deleteCartItem(
+      {
+        where: {
+          id: args.id
+        }
+      },
+      info
+    )
   }
 }
 

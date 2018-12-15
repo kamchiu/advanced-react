@@ -14,6 +14,7 @@ type User {
   resetToken: String
   resetTokenExpiry: String
   permissions: [Permission]
+  cart: [CartItem!]!
 }
 
 type Item {
@@ -23,7 +24,12 @@ type Item {
   image: String
   largeImage: String
   price: Int!
-  # createAt: DateTime!
-  # updaateAt: DateTime!
-  user: User
+  user: User!
+}
+
+type CartItem {
+  id: ID! @unique
+  quantity: Int! @default(value: 1)
+  item: Item!
+  user: User!
 }
