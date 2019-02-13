@@ -27,11 +27,30 @@ export default class RemoveFromCart extends Component {
   static propTypes = {
     id: PropTypes.string.isRequired
   }
+  update = (cache, payload) => {
+    const data = cache.readQuery({ query: CURRENT_USER_QUERY })
+    console.log(data)
+    const removeCartItemId = payload.data.removeFromCart.id
+    data.me.cart = data.me.cart.filter(
+      cartItem => cartItem.id !== removeCartItemId
+    )
+
+    // write the data back to cache
+    cache.writeQuery({ query: CURRENT_USER_QUERY, data })
+  }
   render() {
     return (
       <Mutation
         mutation={REMOVE_CART_ITEM_MUTATION}
         variables={{ id: this.props.id }}
+        update={this.update}
+        optimisticResponse={{
+          __typename: 'Mutation',
+          removeFromCart: {
+            __typename: 'CartItem',
+            id: this.props.id
+          }
+        }}
       >
         {(removeFromCart, { loading, error }) => (
           <BigButton

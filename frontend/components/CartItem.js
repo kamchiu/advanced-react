@@ -18,18 +18,27 @@ const CartItemStyles = styled.li`
   }
 `
 
-const CartItem = ({ cartItem: { item, quantity, id } }) => (
-  <CartItemStyles>
-    <img width="100" src={item.image} alt={item.title} />
-    <div className="cart-item-details">
-      <h3>{item.title}</h3>
-      <p>
-        {formatMoney(item.price * quantity)}
-        {' - '} <em>{quantity}</em>
-      </p>
-    </div>
-    <RemoveFromCart id={id} />
-  </CartItemStyles>
-)
+const CartItem = ({ cartItem: { item, quantity, id } }) => {
+  if (!item)
+    return (
+      <CartItemStyles>
+        <p>this item has been removed!</p>
+        <RemoveFromCart id={id} />
+      </CartItemStyles>
+    )
+  return (
+    <CartItemStyles>
+      <img width="100" src={item.image} alt={item.title} />
+      <div className="cart-item-details">
+        <h3>{item.title}</h3>
+        <p>
+          {formatMoney(item.price * quantity)}
+          {' - '} <em>{quantity}</em>
+        </p>
+      </div>
+      <RemoveFromCart id={id} />
+    </CartItemStyles>
+  )
+}
 
 export default CartItem
